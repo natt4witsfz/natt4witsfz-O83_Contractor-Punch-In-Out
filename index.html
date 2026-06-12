@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>ระบบบันทึกเวลาพนักงาน</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#080C14" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ── VARIABLES ── */
+    :root {
+      --bg:     #080C14;
+      --bg2:    #0F1522;
+      --bg3:    #141D2E;
+      --card:   #1A2338;
+      --card2:  #1F2A3D;
+      --border: #253047;
+      --blue:   #4F8EF7;
+      --purple: #7C5CFA;
+      --green:  #22C55E;
+      --red:    #EF4444;
+      --amber:  #F59E0B;
+      --text:   #F0F4FF;
+      --text2:  #8FA0BE;
+      --text3:  #4A5A7A;
+      --r:      16px;
+      --rsm:    10px;
+      --shadow: 0 8px 40px rgba(0,0,0,0.6);
+    }
+
+    /* ── RESET ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%; overflow: hidden;
+      background: var(--bg); color: var(--text);
+      font-family: 'Sarabun', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    #app { position: fixed; inset: 0; overflow: hidden; }
+
+    /* ── SCREEN SYSTEM ── */
+    .screen {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      overflow-y: auto; overflow-x: hidden;
+      opacity: 0; pointer-events: none;
+      transform: translateX(40px);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+      -webkit-overflow-scrolling: touch;
+    }
+    .screen.active { opacity: 1; pointer-events: all; transform: translateX(0); }
+    .screen.slide-out { opacity: 0; transform: translateX(-40px); }
+
+    /* ── SAFE AREA ── */
+    .st { padding-top: max(18px, env(safe-area-inset-top)); }
+    .sb { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+
+    /* ── HEADER ── */
+    .hdr {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 20px; flex-shrink: 0;
+    }
+    .back {
+      width: 42px; height: 42px; border-radius: 13px;
+      background: var(--card); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 20px; flex-shrink: 0;
+      transition: all 0.18s;
+    }
+    .back:active { transform: scale(0.88); background: var(--card2); }
+    .hdr-title { font-size: 17px; font-weight: 700; }
+    .hdr-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+    .hdr-space { flex: 1; }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 15px 22px; border-radius: var(--r);
+      font-family: 'Sarabun', sans-serif; font-size: 16px; font-weight: 700;
+      border: none; cursor: pointer; transition: all 0.18s;
+      width: 100%; text-decoration: none;
+    }
+    .btn:active { transform: scale(0.95); }
+    .btn-blue {
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: #fff; box-shadow: 0 4px 20px rgba(79,142,247,0.3);
+    }
+    .btn-green {
+      background: linear-gradient(135deg, #16a34a, var(--green));
+      color: #fff; box-shadow: 0 4px 20px rgba(34,197,94,0.3);
+    }
+    .btn-red {
+      background: linear-gradient(135deg, #dc2626, var(--red));
+      color: #fff; box-shadow: 0 4px 20px rgba(239,68,68,0.3);
+    }
+    .btn-ghost {
+      background: transparent; border: 1.5px solid var(--border);
+      color: var(--text2);
+    }
+    .btn-ghost:hover { border-color: var(--blue); color: var(--blue); }
+    .btn-sm { padding: 9px 14px; font-size: 13px; border-radius: var(--rsm); }
+
+    /* ── BADGE ── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 11px; border-radius: 20px;
+      font-size: 12px; font-weight: 700;
+    }
+    .b-blue { background: rgba(79,142,247,.15); color: var(--blue); }
+    .b-green { background: rgba(34,197,94,.15); color: var(--green); }
+    .b-red { background: rgba(239,68,68,.15); color: var(--red); }
+    .b-amber { background: rgba(245,158,11,.15); color: var(--amber); }
+    .b-purple { background: rgba(124,92,250,.15); color: var(--purple); }
+    .b-dim { background: rgba(74,90,122,.2); color: var(--text3); }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 16px;
+    }
+
+    /* ── TOAST ── */
+    #toastWrap {
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+      z-index: 9999; display: flex; flex-direction: column; gap: 8px;
+      pointer-events: none; width: calc(100% - 32px); max-width: 380px;
+    }
+    .toast {
+      background: var(--card2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 11px 15px;
+      font-size: 14px; font-weight: 500;
+      display: flex; align-items: center; gap: 8px;
+      box-shadow: var(--shadow);
+      animation: tIn .28s ease;
+    }
+    .toast.ok  { border-color: rgba(34,197,94,.4); }
+    .toast.err { border-color: rgba(239,68,68,.4); }
+    @keyframes tIn {
+      from { opacity:0; transform: translateY(-8px) scale(.95); }
+      to   { opacity:1; transform: translateY(0) scale(1); }
+    }
+
+    /* ── LOADING ── */
+    #loadWrap {
+      position: fixed; inset: 0; z-index: 800;
+      background: rgba(8,12,20,.88); backdrop-filter: blur(8px);
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px;
+    }
+    #loadWrap.on { display: flex; }
+    .spin {
+      width: 50px; height: 50px;
+      border: 3px solid var(--border); border-top-color: var(--blue);
+      border-radius: 50%; animation: spin .75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .load-txt { font-size: 14px; font-weight: 600; color: var(--text2); }
+
+    /* ════════════════════════════════════════ */
+    /*  SCREEN: HOME                           */
+    /* ════════════════════════════════════════ */
+    #s-home { background: linear-gradient(160deg,#080E20 0%,#060A12 100%); }
+    .home-top { padding: 54px 24px 28px; text-align: center; }
+    .home-logo {
+      width: 84px; height: 84px; margin: 0 auto 18px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      border-radius: 26px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 40px;
+      box-shadow: 0 8px 36px rgba(79,142,247,.45);
+    }
+    .home-title { font-size: 21px; font-weight: 800; }
+    .home-sub { font-size: 13px; color: var(--text2); margin-top: 5px; }
+    .home-datetime { font-size: 13px; color: var(--text2); margin-top: 12px; font-weight: 500; }
+
+    .dept-list { padding: 0 18px 16px; display: flex; flex-direction: column; gap: 13px; }
+    .dept-card {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 22px; padding: 20px;
+      display: flex; align-items: center; gap: 18px;
+      cursor: pointer; transition: all .22s; position: relative; overflow: hidden;
+    }
+    .dept-card::after {
+      content:''; position: absolute; inset:0; opacity:0; transition: opacity .2s;
+    }
+    .dept-card.maid::after  { background: linear-gradient(135deg,rgba(239,68,68,.07),transparent); }
+    .dept-card.sec::after   { background: linear-gradient(135deg,rgba(79,142,247,.07),transparent); }
+    .dept-card.garden::after{ background: linear-gradient(135deg,rgba(34,197,94,.07),transparent); }
+    .dept-card:active::after { opacity:1; }
+    .dept-card:active { transform: scale(.97); border-color: var(--blue); }
+    .dept-icon {
+      width: 62px; height: 62px; border-radius: 18px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 30px; flex-shrink: 0;
+    }
+    .dept-card.maid   .dept-icon { background: rgba(239,68,68,.15); }
+    .dept-card.sec    .dept-icon { background: rgba(79,142,247,.15); }
+    .dept-card.garden .dept-icon { background: rgba(34,197,94,.15); }
+    .dept-name  { font-size: 18px; font-weight: 700; }
+    .dept-count { font-size: 12px; color: var(--text2); margin-top: 3px; }
+    .dept-dots  { display: flex; gap: 5px; margin-top: 7px; flex-wrap: wrap; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--border); }
+    .dot.in  { background: var(--green); box-shadow: 0 0 5px var(--green); }
+    .dot.out { background: var(--text3); }
+    .dept-arrow { margin-left: auto; color: var(--text3); font-size: 22px; }
+
+    .home-foot { padding: 12px 18px 16px; display: flex; justify-content: center; }
+    .admin-btn {
+      display: flex; align-items: center; gap: 7px;
+      padding: 9px 18px; border-radius: 12px;
+      background: var(--card); border: 1px solid var(--border);
+      color: var(--text2); font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all .2s;
+    }
+    .admin-btn:active { border-color: var(--purple); color: var(--purple); }
+
+    /* ════════════════════════════════════════ */
+    /*  SCREEN: PIN                            */
+    /* ════════════════════════════════════════ */
+    #s-pin { background: var(--bg); }
+    .pin-top { padding: 56px 24px 30px; text-align: center; }
+    .pin-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 22px; border-radius: 30px;
+      font-size: 15px; font-weight: 700; margin-bottom: 20px;
+    }
+    .pin-title { font-size: 24px; font-weight: 800; }
+    .pin-sub { font-size: 14px; color: var(--text2); margin-top: 6px; }
+    .pin-dots {
+      display: flex; justify-content: center; gap: 15px;
+      padding: 28px 0 6px;
+    }
+    .pd {
+      width: 19px; height: 19px; border-radius: 50%;
+      background: var(--card2); border: 2px solid var(--border);
+      transition: all .18s;
+    }
+    .pd.on {
+      background: var(--blue); border-color: var(--blue);
+      box-shadow: 0 0 14px rgba(79,142,247,.65);
+      transform: scale(1.18);
+    }
+    .pd.err { background: var(--red); border-color: var(--red); animation: shake .32s ease; }
+    @keyframes shake {
+      0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}
+    }
+    .pin-err { text-align: center; color: var(--red); font-size: 14px; font-weight: 600; min-height: 22px; margin-top: 6px; }
+
+    .pin-pad {
+      display: grid; grid-template-columns: repeat(3,1fr);
+      gap: 11px; padding: 16px 22px 28px;
+      max-width: 340px; margin: 0 auto;
+    }
+    .pk {
+      height: 74px; background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 18px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; transition: all .14s;
+      font-family: 'Sarabun', sans-serif; color: var(--text);
+    }
+    .pk:active { background: var(--card2); transform: scale(.9); border-color: var(--blue); }
+    .pk .n { font-size: 27px; font-weight: 700; line-height: 1; }
+    .pk .a { font-size: 9px; color: var(--text3); letter-spacing: 1px; margin-top: 2px; }
+    .pk.sp { background: var(--card2); }
+    .pk.en {
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      border-color: transparent;
+    }
+    .pk.en .n { font-size: 17px; }
+
+    /* ════════════════════════════════════════ */
+    /*  SCREEN: ACTION                         */
+    /* ════════════════════════════════════════ */
+    #s-action { background: var(--bg); }
+    .act-body {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 20px; gap: 22px;
+    }
+    .act-clock { text-align: center; }
+    .act-time { font-size: 60px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+    .act-date { font-size: 14px; color: var(--text2); margin-top: 6px; }
+    .act-cards { display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 380px; }
+    .act-card {
+      border-radius: 22px; padding: 26px 22px;
+      display: flex; align-items: center; gap: 18px;
+      cursor: pointer; transition: all .2s; border: 2px solid transparent;
+    }
+    .act-card:active { transform: scale(.97); }
+    .act-card.ci {
+      background: linear-gradient(135deg,rgba(34,197,94,.1),rgba(22,163,74,.05));
+      border-color: rgba(34,197,94,.3);
+    }
+    .act-card.ci:active { border-color: var(--green); }
+    .act-card.co {
+      background: linear-gradient(135deg,rgba(239,68,68,.1),rgba(220,38,38,.05));
+      border-color: rgba(239,68,68,.3);
+    }
+    .act-card.co:active { border-color: var(--red); }
+    .act-icon {
+      width: 68px; height: 68px; border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 30px; flex-shrink: 0;
+    }
+    .act-card.ci .act-icon { background: rgba(34,197,94,.18); }
+    .act-card.co .act-icon { background: rgba(239,68,68,.18); }
+    .act-label { font-size: 22px; font-weight: 800; }
+    .act-card.ci .act-label { color: var(--green); }
+    .act-card.co .act-label { color: var(--red); }
+    .act-desc { font-size: 13px; color: var(--text2); margin-top: 3px; }
+    .act-arr { margin-left: auto; color: var(--text3); font-size: 22px; }
+
+    /* ════════════════════════════════════════ */
+    /*  SCREEN: SHIFT                          */
+    /* ════════════════════════════════════════ */
+    #s-shift { background: var(--bg); }
+    .shift-body {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 20px; gap: 16px;
+    }
+    .shift-cards { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 380px; }
+    .shift-card {
+      background: var(--card); border: 2px solid var(--border);
+      border-radius: 22px; padding: 26px 22px;
+      display: flex; align-items: center; gap: 18px;
+      cursor: pointer; transition: all .2s;
+    }
+    .shift-card:active { transform: scale(.97); }
+    .shift-card.am:active { border-color: var(--amber); }
+    .shift-card.pm:active { border-color: var(--purple); }
+    .shift-ico { font-size: 38px; }
+    .shift-name { font-size: 20px; font-weight: 700; }
+    .shift-time { font-size: 13px; color: var(--text2); margin-top: 3px; }
+    .shift-arr { margin-left: auto; color: var(--text3); font-size: 22px; }
+
+    /* ════════════════════════════════════════ */
+    /*  SCREEN: EMPLOYEE GRID                  */
+    /* ════════════════════════════════════════ */
+    #s-grid { background: var(--bg); }
+    .grid-info {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 20px 14px; flex-wrap: wrap;
+    }
+    .emp-grid {
+      display: grid; grid-template-columns: repeat(2,1fr);
+      gap: 13px; padding: 0 18px 22px;
+    }
+    @media(min-width:400px){ .emp-grid { grid-template-columns: repeat(3,1fr); } }
+    @media(min-width:540px){ .emp-grid { grid-template-columns: repeat(4,1fr); } }
+
+    .emp-card {
+      background: var(--card); border: 2px solid var(--border);
+      border-radius: 20px; padding: 16px 10px;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 10px;
+      cursor: pointer; transition: all .2s;
+      position: relative; text-align: center;
+    }
+    .emp-card:active { transform: scale(.93); border-color: var(--blue); }
+    .emp-card.done {
+      border-color: rgba(34,197,94,.35); opacity: .65;
+      pointer-events: none;
+    }
+    .emp-card.done::after {
+      content:'✓';
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,.52);
+      border-radius: 18px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 44px; font-weight: 900; color: var(--green);
+      backdrop-filter: blur(2px);
+    }
+    .emp-av {
+      width: 72px; height: 72px; border-radius: 50%;
+      overflow: hidden;
+      background: linear-gradient(135deg,var(--blue),var(--purple));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; font-weight: 800; color: #fff;
+      flex-shrink: 0;
+    }
+    .emp-av img { width:100%; height:100%; object-fit:cover; }
+    .emp-nm { font-size: 13px; font-weight: 700; line-height: 1.3; }
+    .sub-badge {
+      background: rgba(245,158,11,.15); color: var(--amber);
+      border-radius: 6px; padding: 2px 7px; font-size: 10px; font-weight: 700;
+    }
+    .no-emp {
+      grid-column: 1/-1; text-align: center; padding: 40px 20px; color: var(--text2);
+    }
+
+    /* ════════════════════════════════════════ */
+    /*  SCREEN: CONFIRM                        */
+    /* ════════════════════════════════════════ */
+    #s-confirm { background: var(--bg); }
+    .cf-emp {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 20px 0;
+    }
+    .cf-av {
+      width: 58px; height: 58px; border-radius: 50%;
+      overflow: hidden; flex-shrink: 0;
+      background: linear-gradient(135deg,var(--blue),var(--purple));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 800; color: #fff;
+    }
+    .cf-av img { width:100%; height:100%; object-fit:cover; }
+    .cf-name { font-size: 19px; font-weight: 700; }
+    .cf-dept { font-size: 13px; color: var(--text2); }
+
+    /* camera */
+    .cam-wrap { padding: 14px 18px 10px; }
+    .cam-box {
+      width: 100%; aspect-ratio: 4/3;
+      background: var(--card); border: 2px solid var(--border);
+      border-radius: 20px; overflow: hidden; position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cam-box video { width:100%; height:100%; object-fit:cover; }
+    .cam-box canvas { width:100%; height:100%; object-fit:cover; display:none; }
+    .cam-box canvas.show { display:block; }
+    .cam-placeholder {
+      display:flex; flex-direction:column; align-items:center; gap:10px; color: var(--text3);
+    }
+    .cam-placeholder .ci { font-size: 48px; }
+    .cam-placeholder .ct { font-size: 14px; font-weight: 600; }
+    .cam-overlay {
+      position: absolute; bottom:0; left:0; right:0;
+      background: linear-gradient(transparent,rgba(0,0,0,.72));
+      padding: 18px 12px 10px;
+      font-size: 12px; color: rgba(255,255,255,.85);
+      display: none;
+    }
+    .cam-acts { display:flex; gap:10px; margin-top:10px; }
+    .snap-btn {
+      flex:1; height: 52px;
+      background: linear-gradient(135deg,var(--blue),var(--purple));
+      border:none; border-radius: 14px; color:#fff;
+      font-size: 16px; font-weight: 700; font-family: 'Sarabun',sans-serif;
+      cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+      transition: all .18s;
+    }
+    .snap-btn:active { transform: scale(.95); }
+    .snap-btn.done { background: linear-gradient(135deg,#16a34a,var(--green)); }
+    .retake-btn {
+      height: 52px; padding: 0 16px;
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 14px; color: var(--text2);
+      font-size: 14px; font-weight: 600; font-family: 'Sarabun',sans-serif;
+      cursor:pointer; transition: all .18s; display:none;
+    }
+    .retake-btn:active { transform: scale(.95); }
+
+    /* toggle */
+    .opt-wrap { padding: 0 18px 12px; }
+    .toggle-row {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px 16px;
+    }
+    .tog-ico { font-size: 22px; }
+    .tog-lbl { font-size: 15px; font-weight: 600; }
+    .tog-sub { font-size: 12px; color: var(--text2); }
+    .sw {
+      margin-left: auto; width: 52px; height: 29px;
+      background: var(--card2); border-radius: 15px;
+      border: 1.5px solid var(--border);
+      position: relative; cursor: pointer; transition: all .25s; flex-shrink:0;
+    }
+    .sw::after {
+      content:''; position: absolute; top:3px; left:3px;
+      width: 21px; height: 21px; background: var(--text3);
+      border-radius: 50%; transition: all .25s;
+    }
+    .sw.on { background: rgba(34,197,94,.22); border-color: var(--green); }
+    .sw.on::after { background: var(--green); left: 24px; }
+
+    /* submit */
+    .sub-wrap { padding: 10px 18px 8px; }
+    .photo-warn {
+      display:none; align-items:center; gap:8px;
+      background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.25);
+      border-radius: 10px; padding: 10px 14px;
+      color: var(--red); font-size: 13px; font-weight: 600; margin-bottom: 10px;
+    }
+    .photo-warn.show { display:flex; }
+
+    /* ════════════════════════════════════════ */
+    /*  SCREEN: SUCCESS                        */
+    /* ════════════════════════════════════════ */
+    #s-success { background: var(--bg); }
+    .suc-body {
+      flex:1; display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      padding: 30px 24px; text-align:center;
+    }
+    .suc-icon {
+      width: 104px; height: 104px;
+      background: rgba(34,197,94,.14); border-radius: 50%;
+      display:flex; align-items:center; justify-content:center;
+      font-size: 52px; margin-bottom: 24px;
+      animation: popIn .5s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes popIn { from{transform:scale(.4);opacity:0} to{transform:scale(1);opacity:1} }
+    .suc-title { font-size: 27px; font-weight: 800; color: var(--green); margin-bottom: 8px; }
+    .suc-sub { font-size: 15px; color: var(--text2); }
+    .suc-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 20px; margin: 22px 0;
+      width: 100%; max-width: 320px; text-align:left;
+    }
+    .suc-row {
+      display:flex; justify-content:space-between; align-items:center;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+    }
+    .suc-row:last-child { border-bottom:none; }
+    .suc-lbl { font-size: 13px; color: var(--text2); }
+    .suc-val { font-size: 14px; font-weight: 700; }
+    .suc-cd { font-size: 13px; color: var(--text3); margin-top: 6px; }
+
+    /* ════════════════════════════════════════ */
+    /*  SCREEN: ADMIN HOME                     */
+    /* ════════════════════════════════════════ */
+    #s-admin { background: var(--bg); }
+    .sc { flex:1; overflow-y:auto; padding: 0 18px 20px; }
+
+    .adm-stats {
+      display: grid; grid-template-columns: repeat(3,1fr);
+      gap: 10px; margin-bottom: 16px;
+    }
+    .adm-stat {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px 10px; text-align:center;
+      position: relative; overflow:hidden;
+    }
+    .adm-stat::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    }
+    .adm-stat.in::before  { background: var(--green); }
+    .adm-stat.out::before { background: var(--text3); }
+    .adm-stat.miss::before{ background: var(--amber); }
+    .adm-n { font-size: 29px; font-weight: 800; line-height:1; }
+    .adm-stat.in   .adm-n { color: var(--green); }
+    .adm-stat.miss .adm-n { color: var(--amber); }
+    .adm-l { font-size: 11px; color: var(--text2); margin-top: 4px; font-weight: 600; }
+
+    .sec-ttl { font-size: 12px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing:.5px; margin-bottom:10px; }
+
+    .dept-row {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; margin-bottom: 8px; overflow:hidden;
+    }
+    .dept-row-hd {
+      display:flex; align-items:center; gap:10px;
+      padding: 13px 14px; cursor:pointer;
+    }
+    .dept-row-nm { font-size:15px; font-weight:700; }
+    .dept-row-ct { margin-left:auto; font-size:13px; color:var(--text2); }
+    .dept-row-ar { color:var(--text3); font-size:16px; transition: transform .2s; }
+    .dept-row-ar.open { transform: rotate(90deg); }
+    .dept-emp-list { padding: 0 14px 12px; }
+    .dei {
+      display:flex; align-items:center; gap:10px;
+      padding: 9px 0; border-top: 1px solid var(--border);
+    }
+    .dei-av {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: linear-gradient(135deg,var(--blue),var(--purple));
+      display:flex; align-items:center; justify-content:center;
+      font-size: 13px; font-weight:700; color:#fff; flex-shrink:0;
+      overflow:hidden;
+    }
+    .dei-av img { width:100%; height:100%; object-fit:cover; }
+    .dei-nm { font-size:14px; font-weight:600; }
+    .dei-tm { font-size:12px; color:var(--text2); }
+    .dei-st { margin-left:auto; }
+
+    .adm-menu {
+      display: grid; grid-template-columns: repeat(2,1fr);
+      gap: 11px; margin-top: 4px;
+    }
+    .adm-mi {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 18px 14px;
+      display:flex; flex-direction:column; gap:8px;
+      cursor:pointer; transition: all .2s;
+    }
+    .adm-mi:active { transform: scale(.95); border-color: var(--blue); }
+    .adm-mi-ic { font-size: 26px; }
+    .adm-mi-lb { font-size: 15px; font-weight: 700; }
+    .adm-mi-ds { font-size: 12px; color: var(--text2); }
+
+    /* ════════════════════════════════════════ */
+    /*  SCREEN: ADMIN EMPLOYEES               */
+    /* ════════════════════════════════════════ */
+    #s-emp { background: var(--bg); }
+    .dept-tabs {
+      display:flex; overflow-x:auto; padding: 0 18px 14px;
+      gap:8px; scrollbar-width:none;
+    }
+    .dept-tabs::-webkit-scrollbar { display:none; }
+    .dtab {
+      padding: 8px 16px; border-radius: 20px;
+      font-size:13px; font-weight:600;
+      border: 1.5px solid var(--border); background: var(--card);
+      color: var(--text2); cursor:pointer; white-space:nowrap;
+      transition: all .2s; flex-shrink:0;
+    }
+    .dtab.act { background: rgba(79,142,247,.14); border-color: var(--blue); color: var(--blue); }
+    .emp-list { padding: 0 18px; }
+    .em-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 14px;
+      display:flex; align-items:center; gap:14px;
+      margin-bottom: 10px;
+    }
+    .em-av {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: linear-gradient(135deg,var(--blue),var(--purple));
+      display:flex; align-items:center; justify-content:center;
+      font-size: 20px; font-weight:800; color:#fff;
+      overflow:hidden; cursor:pointer; position:relative; flex-shrink:0;
+    }
+    .em-av img { width:100%; height:100%; object-fit:cover; }
+    .em-av .ov {
+      position:absolute; inset:0; background: rgba(0,0,0,.5);
+      display:flex; align-items:center; justify-content:center;
+      font-size:18px; opacity:0; transition: opacity .2s;
+    }
+    .em-av:hover .ov { opacity:1; }
+    .em-av:active .ov { opacity:1; }
+    .em-ni {
+      background:none; border:none; color:var(--text);
+      font-family:'Sarabun',sans-serif; font-size:16px; font-weight:700;
+      width:100%; border-bottom: 1px dashed var(--border); padding:3px 0;
+      transition: border-color .2s;
+    }
+    .em-ni:focus { outline:none; border-color: var(--blue); }
+    .em-sub { font-size:12px; color:var(--text2); margin-top:4px; }
+    .em-del {
+      width:36px; height:36px; border-radius:10px;
+      background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.2);
+      color: var(--red); font-size:16px;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; transition: all .2s; flex-shrink:0;
+    }
+    .em-del:active { background: var(--red); color:#fff; }
+    .add-emp-btn {
+      background:transparent; border: 2px dashed var(--border);
+      border-radius:16px; padding:15px;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      cursor:pointer; color:var(--text2); font-size:14px; font-weight:600;
+      margin-bottom:10px; transition: all .2s; width:100%;
+      font-family:'Sarabun',sans-serif;
+    }
+    .add-emp-btn:active { border-color:var(--blue); color:var(--blue); }
+    input[type=file] { display:none; }
+
+    /* ════════════════════════════════════════ */
+    /*  SCREEN: ADMIN PINS                     */
+    /* ════════════════════════════════════════ */
+    #s-pins { background: var(--bg); }
+    .pin-mc { background: var(--card); border: 1px solid var(--border); border-radius:16px; padding:18px; margin-bottom:12px; }
+    .pm-hd { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+    .pm-ic { font-size:22px; }
+    .pm-nm { font-size:16px; font-weight:700; }
+    .pm-bd { margin-left:auto; }
+    .pf { display:flex; gap:8px; align-items:center; }
+    .pdsp {
+      flex:1; background:var(--bg2); border:1.5px solid var(--border);
+      border-radius:10px; padding:12px 14px;
+      font-size:18px; letter-spacing:6px; font-weight:700; color:var(--text);
+    }
+    .p-edit {
+      height:44px; padding:0 14px;
+      background:var(--card2); border:1.5px solid var(--border);
+      border-radius:10px; color:var(--blue); font-size:14px; font-weight:600;
+      font-family:'Sarabun',sans-serif; cursor:pointer; transition: all .2s;
+    }
+    .p-edit:active { background: rgba(79,142,247,.15); }
+    .p-inp {
+      flex:1; background:var(--bg2); border:1.5px solid var(--blue);
+      border-radius:10px; padding:12px 14px; font-size:18px;
+      letter-spacing:4px; font-weight:700; color:var(--text);
+      font-family:'Sarabun',monospace; display:none;
+    }
+    .p-inp.show { display:block; }
+    .p-save {
+      height:44px; padding:0 14px;
+      background: rgba(34,197,94,.15); border:1.5px solid rgba(34,197,94,.3);
+      border-radius:10px; color:var(--green); font-size:14px; font-weight:600;
+      font-family:'Sarabun',sans-serif; cursor:pointer; display:none; transition: all .2s;
+    }
+    .p-save.show { display:block; }
+    .p-save:active { background: rgba(34,197,94,.25); }
+
+    /* ════════════════════════════════════════ */
+    /*  SCREEN: ADMIN SETTINGS                 */
+    /* ════════════════════════════════════════ */
+    #s-set { background: var(--bg); }
+    .st-card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px; margin-bottom:12px; }
+    .st-lbl { font-size:13px; font-weight:700; color:var(--text2); margin-bottom:8px; }
+    .st-inp {
+      width:100%; background:var(--bg2); border:1.5px solid var(--border);
+      border-radius:10px; padding:12px 14px; color:var(--text);
+      font-family:'Sarabun',sans-serif; font-size:14px; transition: border-color .2s;
+    }
+    .st-inp:focus { outline:none; border-color:var(--blue); }
+    .st-help { font-size:12px; color:var(--text3); margin-top:6px; }
+    .danger {
+      background: rgba(239,68,68,.06); border: 1px solid rgba(239,68,68,.2);
+      border-radius:16px; padding:18px; margin-bottom:16px;
+    }
+    .danger-ttl { font-size:14px; font-weight:700; color:var(--red); margin-bottom:12px; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══════════ HOME ══════════ -->
+  <div class="screen active" id="s-home">
+    <div class="home-top st">
+      <div class="home-logo">🏢</div>
+      <div class="home-title" id="hm-name">นิติบุคคลคอนโด</div>
+      <div class="home-sub" id="hm-rooms"></div>
+      <div class="home-datetime" id="hm-dt"></div>
+    </div>
+    <div class="dept-list" id="dept-list"></div>
+    <div class="home-foot sb">
+      <div class="admin-btn" onclick="goAdmin()">⚙️ &nbsp;ผู้ดูแลระบบ (Admin)</div>
+    </div>
+  </div>
+
+  <!-- ══════════ PIN ══════════ -->
+  <div class="screen" id="s-pin">
+    <div class="pin-top st">
+      <div class="pin-badge" id="pin-badge">🧹 แม่บ้าน</div>
+      <div class="pin-title">กรอกรหัส PIN</div>
+      <div class="pin-sub">กรอก PIN 6 หลักของแผนกคุณ</div>
+      <div class="pin-dots">
+        <div class="pd" id="d0"></div><div class="pd" id="d1"></div>
+        <div class="pd" id="d2"></div><div class="pd" id="d3"></div>
+        <div class="pd" id="d4"></div><div class="pd" id="d5"></div>
+      </div>
+      <div class="pin-err" id="pin-err"></div>
+    </div>
+    <div class="pin-pad">
+      <div class="pk" onclick="pi('1')"><span class="n">1</span></div>
+      <div class="pk" onclick="pi('2')"><span class="n">2</span><span class="a">ABC</span></div>
+      <div class="pk" onclick="pi('3')"><span class="n">3</span><span class="a">DEF</span></div>
+      <div class="pk" onclick="pi('4')"><span class="n">4</span><span class="a">GHI</span></div>
+      <div class="pk" onclick="pi('5')"><span class="n">5</span><span class="a">JKL</span></div>
+      <div class="pk" onclick="pi('6')"><span class="n">6</span><span class="a">MNO</span></div>
+      <div class="pk" onclick="pi('7')"><span class="n">7</span><span class="a">PQRS</span></div>
+      <div class="pk" onclick="pi('8')"><span class="n">8</span><span class="a">TUV</span></div>
+      <div class="pk" onclick="pi('9')"><span class="n">9</span><span class="a">WXYZ</span></div>
+      <div class="pk sp" onclick="goHome()"><span class="n" style="font-size:17px">⬅</span><span class="a">ย้อนกลับ</span></div>
+      <div class="pk" onclick="pi('0')"><span class="n">0</span></div>
+      <div class="pk sp" onclick="pd()"><span class="n">⌫</span></div>
+    </div>
+  </div>
+
+  <!-- ══════════ ACTION ══════════ -->
+  <div class="screen" id="s-action">
+    <div class="hdr st">
+      <div class="back" onclick="SS('home')">←</div>
+      <div>
+        <div class="hdr-title" id="act-dept"></div>
+        <div class="hdr-sub">เลือกประเภทการบันทึก</div>
+      </div>
+    </div>
+    <div class="act-body">
+      <div class="act-clock">
+        <div class="act-time" id="act-clock"></div>
+        <div class="act-date" id="act-date"></div>
+      </div>
+      <div class="act-cards">
+        <div class="act-card ci" onclick="selAction('checkin')">
+          <div class="act-icon">🟢</div>
+          <div>
+            <div class="act-label">เข้างาน</div>
+            <div class="act-desc">บันทึกเวลาเริ่มงาน</div>
+          </div>
+          <div class="act-arr">›</div>
+        </div>
+        <div class="act-card co" onclick="selAction('checkout')">
+          <div class="act-icon">🔴</div>
+          <div>
+            <div class="act-label">ออกงาน</div>
+            <div class="act-desc">บันทึกเวลาสิ้นสุดงาน</div>
+          </div>
+          <div class="act-arr">›</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ SHIFT ══════════ -->
+  <div class="screen" id="s-shift">
+    <div class="hdr st">
+      <div class="back" onclick="SS('action')">←</div>
+      <div>
+        <div class="hdr-title">รปภ — เลือกกะ</div>
+        <div class="hdr-sub" id="shift-act-lbl">เข้างาน</div>
+      </div>
+    </div>
+    <div class="shift-body">
+      <div class="shift-cards">
+        <div class="shift-card am" onclick="selShift('รปภ กะเช้า')">
+          <div class="shift-ico">🌅</div>
+          <div>
+            <div class="shift-name">กะเช้า</div>
+            <div class="shift-time">06:00 — 18:00 น.</div>
+          </div>
+          <div class="shift-arr">›</div>
+        </div>
+        <div class="shift-card pm" onclick="selShift('รปภ กะบ่าย')">
+          <div class="shift-ico">🌙</div>
+          <div>
+            <div class="shift-name">กะบ่าย / กะดึก</div>
+            <div class="shift-time">18:00 — 06:00 น.</div>
+          </div>
+          <div class="shift-arr">›</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ GRID ══════════ -->
+  <div class="screen" id="s-grid">
+    <div class="hdr st">
+      <div class="back" id="grid-back" onclick="gridBack()">←</div>
+      <div>
+        <div class="hdr-title" id="grid-ttl"></div>
+        <div class="hdr-sub" id="grid-sub"></div>
+      </div>
+    </div>
+    <div class="grid-info">
+      <span class="badge" id="grid-badge">เข้างาน</span>
+      <span style="font-size:12px;color:var(--text2)" id="grid-shift-lbl"></span>
+      <span style="margin-left:auto;font-size:12px;color:var(--text3)" id="grid-cnt"></span>
+    </div>
+    <div class="emp-grid" id="emp-grid"></div>
+  </div>
+
+  <!-- ══════════ CONFIRM ══════════ -->
+  <div class="screen" id="s-confirm">
+    <div class="hdr st">
+      <div class="back" onclick="SS('grid');stopCam()">←</div>
+      <div>
+        <div class="hdr-title" id="cf-act-lbl">บันทึกเข้างาน</div>
+        <div class="hdr-sub">ถ่ายรูปและยืนยัน</div>
+      </div>
+    </div>
+
+    <div class="cf-emp">
+      <div class="cf-av" id="cf-av"></div>
+      <div>
+        <div class="cf-name" id="cf-nm"></div>
+        <div class="cf-dept" id="cf-dept"></div>
+      </div>
+    </div>
+
+    <div class="cam-wrap">
+      <div class="cam-box" id="cam-box">
+        <video id="cam-vid" playsinline autoplay muted></video>
+        <canvas id="cam-cv"></canvas>
+        <div class="cam-placeholder" id="cam-ph">
+          <div class="ci">📷</div>
+          <div class="ct">กดปุ่มเพื่อเปิดกล้อง</div>
+        </div>
+        <div class="cam-overlay" id="cam-ov">
+          <div id="ov-name"></div>
+          <div id="ov-time"></div>
+        </div>
+      </div>
+      <div class="cam-acts">
+        <button class="snap-btn" id="snap-btn" onclick="snapBtn()">📷 เปิดกล้อง</button>
+        <button class="retake-btn" id="retake-btn" onclick="retake()">🔄 ถ่ายใหม่</button>
+      </div>
+    </div>
+
+    <div class="opt-wrap">
+      <div class="toggle-row">
+        <div class="tog-ico">👤</div>
+        <div>
+          <div class="tog-lbl">พนักงานสำรอง</div>
+          <div class="tog-sub">เปิดหากเป็นพนักงานทดแทน</div>
+        </div>
+        <div class="sw" id="sub-sw" onclick="toggleSub()"></div>
+      </div>
+    </div>
+
+    <div class="sub-wrap">
+      <div class="photo-warn" id="photo-warn">⚠️ กรุณาถ่ายรูปก่อนส่งข้อมูล</div>
+      <button class="btn btn-green" onclick="submit()">✅ ยืนยันส่งข้อมูล</button>
+    </div>
+    <div style="height:20px"></div>
+  </div>
+
+  <!-- ══════════ SUCCESS ══════════ -->
+  <div class="screen" id="s-success">
+    <div class="suc-body st sb">
+      <div class="suc-icon">✅</div>
+      <div class="suc-title">บันทึกสำเร็จ!</div>
+      <div class="suc-sub" id="suc-sub"></div>
+      <div class="suc-card">
+        <div class="suc-row"><span class="suc-lbl">ชื่อพนักงาน</span><span class="suc-val" id="suc-nm"></span></div>
+        <div class="suc-row"><span class="suc-lbl">แผนก</span><span class="suc-val" id="suc-dept"></span></div>
+        <div class="suc-row"><span class="suc-lbl">ประเภท</span><span class="suc-val" id="suc-act"></span></div>
+        <div class="suc-row"><span class="suc-lbl">เวลา</span><span class="suc-val" id="suc-time"></span></div>
+        <div class="suc-row" id="suc-sub-row" style="display:none">
+          <span class="suc-lbl">สถานะ</span>
+          <span class="badge b-amber">👤 พนักงานสำรอง</span>
+        </div>
+      </div>
+      <div class="suc-cd" id="suc-cd"></div>
+      <button class="btn btn-green" onclick="goGrid()" style="max-width:280px;margin-top:12px">👥 กลับหน้าพนักงาน</button>
+      <button class="btn btn-ghost" onclick="goHome()" style="max-width:200px;margin-top:10px;font-size:13px;padding:10px">⬅ กลับหน้าหลัก (เปลี่ยนแผนก)</button>
+    </div>
+  </div>
+
+  <!-- ══════════ ADMIN HOME ══════════ -->
+  <div class="screen" id="s-admin">
+    <div class="hdr st">
+      <div class="back" onclick="adminOut()">←</div>
+      <div>
+        <div class="hdr-title">Admin Dashboard</div>
+        <div class="hdr-sub" id="adm-dt"></div>
+      </div>
+    </div>
+    <div class="sc">
+      <div class="adm-stats">
+        <div class="adm-stat in">
+          <div class="adm-n" id="st-in">0</div>
+          <div class="adm-l">เข้างานแล้ว</div>
+        </div>
+        <div class="adm-stat out">
+          <div class="adm-n" id="st-out">0</div>
+          <div class="adm-l">ออกงานแล้ว</div>
+        </div>
+        <div class="adm-stat miss">
+          <div class="adm-n" id="st-miss">0</div>
+          <div class="adm-l">ยังไม่เข้า</div>
+        </div>
+      </div>
+
+      <div class="sec-ttl">รายละเอียดรายแผนก</div>
+      <div id="dept-bd"></div>
+
+      <div class="sec-ttl" style="margin-top:16px">จัดการระบบ</div>
+      <div class="adm-menu">
+        <div class="adm-mi" onclick="SS('emp')">
+          <div class="adm-mi-ic">👥</div>
+          <div class="adm-mi-lb">จัดการพนักงาน</div>
+          <div class="adm-mi-ds">เพิ่ม/แก้ไข/ลบ + รูป</div>
+        </div>
+        <div class="adm-mi" onclick="SS('pins')">
+          <div class="adm-mi-ic">🔐</div>
+          <div class="adm-mi-lb">จัดการ PIN</div>
+          <div class="adm-mi-ds">เปลี่ยน PIN แต่ละแผนก</div>
+        </div>
+        <div class="adm-mi" onclick="SS('set')">
+          <div class="adm-mi-ic">⚙️</div>
+          <div class="adm-mi-lb">ตั้งค่าระบบ</div>
+          <div class="adm-mi-ds">Google Apps Script URL</div>
+        </div>
+        <div class="adm-mi" onclick="exportCSV()">
+          <div class="adm-mi-ic">📊</div>
+          <div class="adm-mi-lb">Export CSV</div>
+          <div class="adm-mi-ds">ข้อมูลวันนี้</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ ADMIN EMPLOYEES ══════════ -->
+  <div class="screen" id="s-emp">
+    <div class="hdr st">
+      <div class="back" onclick="SS('admin')">←</div>
+      <div>
+        <div class="hdr-title">จัดการพนักงาน</div>
+        <div class="hdr-sub">กดรูปเพื่อเปลี่ยน · กดชื่อเพื่อแก้ไข</div>
+      </div>
+      <div class="hdr-space"></div>
+      <button class="btn btn-blue btn-sm" style="width:auto" onclick="toastMsg('✅ บันทึกอัตโนมัติทุกครั้งที่แก้ไข','ok')">💾 บันทึก</button>
+    </div>
+    <div class="dept-tabs" id="emp-tabs"></div>
+    <div class="emp-list" id="emp-list"></div>
+    <input type="file" id="photo-inp" accept="image/*" onchange="onPhoto(event)" />
+  </div>
+
+  <!-- ══════════ ADMIN PINS ══════════ -->
+  <div class="screen" id="s-pins">
+    <div class="hdr st">
+      <div class="back" onclick="SS('admin')">←</div>
+      <div>
+        <div class="hdr-title">จัดการ PIN</div>
+        <div class="hdr-sub">เปลี่ยนรหัส PIN แต่ละแผนก</div>
+      </div>
+    </div>
+    <div style="padding:0 18px" id="pins-list"></div>
+  </div>
+
+  <!-- ══════════ ADMIN SETTINGS ══════════ -->
+  <div class="screen" id="s-set">
+    <div class="hdr st">
+      <div class="back" onclick="SS('admin')">←</div>
+      <div>
+        <div class="hdr-title">ตั้งค่าระบบ</div>
+        <div class="hdr-sub">การเชื่อมต่อ Google</div>
+      </div>
+    </div>
+    <div style="padding:0 18px">
+      <div class="st-card">
+        <div class="st-lbl">🏢 ชื่อโครงการ</div>
+        <input class="st-inp" id="si-name" placeholder="ชื่อคอนโด" />
+      </div>
+      <div class="st-card">
+        <div class="st-lbl">🏠 จำนวนห้อง</div>
+        <input class="st-inp" id="si-rooms" placeholder="882" type="number" />
+      </div>
+      <div class="st-card">
+        <div class="st-lbl">🔗 Google Apps Script URL</div>
+        <input class="st-inp" id="si-gas" placeholder="https://script.google.com/macros/s/..." />
+        <div class="st-help">วาง URL ที่ได้จากการ Deploy Google Apps Script</div>
+      </div>
+      <div class="st-card">
+        <div class="st-lbl">📁 Google Drive Main Folder ID</div>
+        <input class="st-inp" id="si-drive" placeholder="1ABCxyz..." />
+        <div class="st-help">ID จาก URL ของ Google Drive Folder ที่จะเก็บรูป</div>
+      </div>
+      <div class="st-card">
+        <div class="st-lbl">📊 Google Sheet ID</div>
+        <input class="st-inp" id="si-sheet" placeholder="1ABCxyz..." />
+        <div class="st-help">ID จาก URL ของ Google Sheets</div>
+      </div>
+      <button class="btn btn-blue" onclick="saveSet()">💾 บันทึกการตั้งค่า</button>
+      <button class="btn btn-ghost" onclick="testGAS()" style="margin-top:10px">🔗 ทดสอบเชื่อมต่อ GAS</button>
+      <div id="gas-test-res" style="display:none;margin-top:10px;padding:12px;border-radius:12px;font-size:13px;font-weight:600;"></div>
+
+      <div style="height:16px"></div>
+      <div class="danger">
+        <div class="danger-ttl">⚠️ Danger Zone</div>
+        <button class="btn btn-red btn-sm" style="width:auto;margin-bottom:8px" onclick="clearToday()">🗑️ ล้างข้อมูลวันนี้</button><br/>
+        <button class="btn btn-ghost btn-sm" style="width:auto;margin-top:8px;border-color:rgba(239,68,68,.3);color:var(--red)" onclick="clearAll()">ลบข้อมูลทั้งหมด</button>
+      </div>
+      <div style="height:20px"></div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<div id="loadWrap"><div class="spin"></div><div class="load-txt" id="load-txt">กำลังส่งข้อมูล...</div></div>
+<div id="toastWrap"></div>
+
+<script>
+// ════════════════════════════════════
+// STORE KEYS
+// ════════════════════════════════════
+const K = { emps:'c_emps', pins:'c_pins', att:'c_att', cfg:'c_cfg', rst:'c_rst' };
+const LD = k => { try { return JSON.parse(localStorage.getItem(k)); } catch{ return null; } };
+const SV = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+
+// ════════════════════════════════════
+// DEFAULT DATA
+// ════════════════════════════════════
+const DEF_EMPS = {
+  'แม่บ้าน':    [{id:'mb1',name:'แม่บ้าน 1',photo:null},{id:'mb2',name:'แม่บ้าน 2',photo:null},{id:'mb3',name:'แม่บ้าน 3',photo:null},{id:'mb4',name:'แม่บ้าน 4',photo:null},{id:'mb5',name:'แม่บ้าน 5',photo:null},{id:'mb6',name:'แม่บ้าน 6',photo:null},{id:'mb7',name:'แม่บ้าน 7',photo:null},{id:'mb8',name:'แม่บ้าน 8',photo:null},{id:'mb9',name:'แม่บ้าน 9',photo:null}],
+  'รปภ กะเช้า': [{id:'sc1',name:'รปภ เช้า 1',photo:null},{id:'sc2',name:'รปภ เช้า 2',photo:null},{id:'sc3',name:'รปภ เช้า 3',photo:null},{id:'sc4',name:'รปภ เช้า 4',photo:null},{id:'sc5',name:'รปภ เช้า 5',photo:null}],
+  'รปภ กะบ่าย': [{id:'sp1',name:'รปภ บ่าย 1',photo:null},{id:'sp2',name:'รปภ บ่าย 2',photo:null},{id:'sp3',name:'รปภ บ่าย 3',photo:null},{id:'sp4',name:'รปภ บ่าย 4',photo:null},{id:'sp5',name:'รปภ บ่าย 5',photo:null}],
+  'คนสวน':      [{id:'gd1',name:'คนสวน 1',photo:null},{id:'gd2',name:'คนสวน 2',photo:null},{id:'gd3',name:'คนสวน 3',photo:null}],
+};
+const DEF_PINS = { 'แม่บ้าน':'111111','รปภ':'222222','คนสวน':'333333','admin':'999999' };
+const DEF_CFG  = { condoName:'นิติบุคคลคอนโด', rooms:'882', gasUrl:'', driveId:'1KgG67CICa75sQXKzNVDhudjfFbly-yUk', sheetId:'1i3WpSbTnSgTBOGDSC9yJvTSfiEw0ZgG9gVBziTsRSxg' };
+
+const getEmps = () => LD(K.emps) || JSON.parse(JSON.stringify(DEF_EMPS));
+const getPins = () => LD(K.pins) || { ...DEF_PINS };
+const getCfg  = () => ({ ...DEF_CFG, ...(LD(K.cfg)||{}) });
+
+function todayKey() { return new Date().toISOString().slice(0,10); }
+function getAtt() { return LD(K.att) || {}; }
+function getTodayAtt() { return (getAtt())[todayKey()] || {}; }
+function saveTodayAtt(today) { const a=getAtt(); a[todayKey()]=today; SV(K.att,a); }
+
+// ════════════════════════════════════
+// STATE
+// ════════════════════════════════════
+const S = {
+  screen:'home', dept:null, shift:null, effDept:null,
+  action:null, emp:null, photo:null, photoTaken:false,
+  isSub:false, pin:'', isAdmin:false, stream:null,
+  empTab:null, editPhotoId:null,
+};
+
+// ════════════════════════════════════
+// AUTO RESET @ 07:00
+// ════════════════════════════════════
+function checkReset() {
+  const now=new Date(), today=todayKey();
+  if(now.getHours()>=7 && LD(K.rst)!==today) SV(K.rst,today);
+}
+
+// ════════════════════════════════════
+// SCREEN NAV
+// ════════════════════════════════════
+function SS(name) {
+  const prev=document.querySelector('.screen.active');
+  if(prev){ prev.classList.add('slide-out'); setTimeout(()=>prev.classList.remove('active','slide-out'),280); }
+  const next=document.getElementById('s-'+name);
+  if(next) setTimeout(()=>next.classList.add('active'), prev?100:0);
+  S.screen=name;
+  // hooks
+  if(name==='admin')  setTimeout(renderAdmin,120);
+  if(name==='emp')    setTimeout(renderEmpMgr,120);
+  if(name==='pins')   setTimeout(renderPins,120);
+  if(name==='set')    setTimeout(renderSet,120);
+  if(name==='home')   setTimeout(renderHome,120);
+  if(name==='grid')   setTimeout(renderGrid,120);
+}
+
+function goHome() {
+  stopCam();
+  S.dept=S.shift=S.action=S.emp=S.photo=null;
+  S.photoTaken=S.isSub=S.isAdmin=false;
+  S.pin=''; updateDots();
+  SS('home');
+}
+function gridBack() { S.dept==='รปภ' ? SS('shift') : SS('action'); }
+function adminOut() { S.isAdmin=false; goHome(); }
+
+// ════════════════════════════════════
+// HOME
+// ════════════════════════════════════
+const DEPT_META = {
+  'แม่บ้าน': { icon:'🧹', cls:'maid',   pkey:'แม่บ้าน' },
+  'รปภ':     { icon:'🛡️', cls:'sec',    pkey:'รปภ' },
+  'คนสวน':   { icon:'🌿', cls:'garden', pkey:'คนสวน' },
+};
+
+function renderHome() {
+  const cfg=getCfg(), emps=getEmps(), today=getTodayAtt();
+  document.getElementById('hm-name').textContent = cfg.condoName||'นิติบุคคลคอนโด';
+  document.getElementById('hm-rooms').textContent = cfg.rooms ? `จำนวน ${cfg.rooms} ห้อง` : '';
+  updateHomeDT();
+
+  const list=document.getElementById('dept-list');
+  list.innerHTML = Object.keys(DEPT_META).map(dept=>{
+    const m=DEPT_META[dept];
+    const keys = dept==='รปภ' ? ['รปภ กะเช้า','รปภ กะบ่าย'] : [dept];
+    const all  = keys.flatMap(k=>emps[k]||[]);
+    const inCnt= all.filter(e=>today[e.id]?.checkin).length;
+    const dots = all.slice(0,10).map(e=>`<div class="dot ${today[e.id]?.checkin?'in':''}"></div>`).join('');
+    return `<div class="dept-card ${m.cls}" onclick="selDept('${dept}')">
+      <div class="dept-icon">${m.icon}</div>
+      <div style="flex:1">
+        <div class="dept-name">${dept}</div>
+        <div class="dept-count">เข้างาน ${inCnt}/${all.length} คน</div>
+        <div class="dept-dots">${dots}</div>
+      </div>
+      <div class="dept-arrow">›</div>
+    </div>`;
+  }).join('');
+}
+
+function updateHomeDT() {
+  const n=new Date();
+  const days=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  const ms=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const t=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const el=document.getElementById('hm-dt');
+  if(el) el.textContent=`วัน${days[n.getDay()]} ${n.getDate()} ${ms[n.getMonth()]} ${n.getFullYear()+543}  ·  ${t} น.`;
+}
+
+// ════════════════════════════════════
+// DEPT → PIN
+// ════════════════════════════════════
+function selDept(dept) {
+  S.dept=dept; S.isAdmin=false; S.pin=''; updateDots();
+  document.getElementById('pin-err').textContent='';
+  const m=DEPT_META[dept];
+  const badge=document.getElementById('pin-badge');
+  badge.textContent=`${m.icon} ${dept}`;
+  badge.style.cssText=`background:${m.cls==='maid'?'rgba(239,68,68,.18)':m.cls==='sec'?'rgba(79,142,247,.18)':'rgba(34,197,94,.18)'};color:${m.cls==='maid'?'#EF4444':m.cls==='sec'?'#4F8EF7':'#22C55E'}`;
+  SS('pin');
+}
+function goAdmin() {
+  S.dept='admin'; S.isAdmin=true; S.pin=''; updateDots();
+  document.getElementById('pin-err').textContent='';
+  const badge=document.getElementById('pin-badge');
+  badge.textContent='⚙️ Admin';
+  badge.style.cssText='background:rgba(124,92,250,.18);color:#7C5CFA';
+  SS('pin');
+}
+
+// ════════════════════════════════════
+// PIN PAD
+// ════════════════════════════════════
+function pi(d) { if(S.pin.length>=6)return; S.pin+=d; updateDots(); if(S.pin.length===6)setTimeout(verifyPin,180); }
+function pd()  { S.pin=S.pin.slice(0,-1); updateDots(); }
+function updateDots() {
+  for(let i=0;i<6;i++){
+    const el=document.getElementById('d'+i);
+    if(el) el.className='pd'+(i<S.pin.length?' on':'');
+  }
+}
+function verifyPin() {
+  const pins=getPins();
+  const correct = S.isAdmin ? pins['admin'] : pins[S.dept];
+  if(S.pin===correct) {
+    document.getElementById('pin-err').textContent='';
+    if(S.isAdmin){ SS('admin'); }
+    else { renderActionScreen(); SS('action'); }
+    S.pin=''; updateDots();
+  } else {
+    document.getElementById('pin-err').textContent='PIN ไม่ถูกต้อง กรุณาลองใหม่';
+    document.querySelectorAll('.pd').forEach(d=>d.classList.add('err'));
+    setTimeout(()=>{ document.querySelectorAll('.pd').forEach(d=>d.classList.remove('err','on')); },600);
+    S.pin=''; updateDots();
+  }
+}
+
+// ════════════════════════════════════
+// ACTION
+// ════════════════════════════════════
+function renderActionScreen() {
+  const m=DEPT_META[S.dept];
+  document.getElementById('act-dept').textContent=`${m.icon} ${S.dept}`;
+  tickClock();
+}
+function tickClock() {
+  const n=new Date();
+  const days=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  const ms=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const ce=document.getElementById('act-clock'); if(ce)ce.textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const de=document.getElementById('act-date'); if(de)de.textContent=`วัน${days[n.getDay()]}ที่ ${n.getDate()} ${ms[n.getMonth()]} ${n.getFullYear()+543}`;
+}
+function selAction(act) {
+  S.action=act;
+  if(S.dept==='รปภ'){
+    document.getElementById('shift-act-lbl').textContent=act==='checkin'?'🟢 เข้างาน':'🔴 ออกงาน';
+    SS('shift');
+  } else { S.effDept=S.dept; S.shift=null; SS('grid'); }
+}
+function selShift(shift) { S.shift=shift; S.effDept=shift; SS('grid'); }
+
+// ════════════════════════════════════
+// EMPLOYEE GRID
+// ════════════════════════════════════
+// ════════════════════════════════════
+// EMPLOYEE GRID
+// ════════════════════════════════════
+function renderGrid() {
+  const emps=getEmps(), today=getTodayAtt();
+  const dep=S.effDept, dEmps=emps[dep]||[];
+  const akey=S.action==='checkin'?'checkin':'checkout';
+
+  document.getElementById('grid-ttl').textContent=dep;
+  document.getElementById('grid-sub').textContent=`เลือกพนักงาน${S.action==='checkin'?'เข้างาน':'ออกงาน'}`;
+  const gb=document.getElementById('grid-badge');
+  gb.textContent=S.action==='checkin'?'🟢 เข้างาน':'🔴 ออกงาน';
+  gb.className='badge '+(S.action==='checkin'?'b-green':'b-red');
+  const sl=document.getElementById('grid-shift-lbl');
+  sl.textContent=S.shift?(S.shift==='รปภ กะเช้า'?'🌅 กะเช้า':'🌙 กะบ่าย'):'';
+  
+  const done=dEmps.filter(e=>today[e.id]?.[akey]).length;
+  document.getElementById('grid-cnt').textContent=`${done}/${dEmps.length} คน`;
+
+  const grid=document.getElementById('emp-grid');
+  if(!dEmps.length){
+    grid.innerHTML=`<div class="no-emp"><div style="font-size:42px;margin-bottom:10px">👤</div><div>ยังไม่มีพนักงานในแผนกนี้</div><div style="font-size:12px;margin-top:6px;color:var(--text3)">เพิ่มพนักงานในหน้า Admin</div></div>`;
+    return;
+  }
+  
+  grid.innerHTML=dEmps.map(emp=>{
+    const att=today[emp.id], isDone=!!att?.[akey];
+    const init=initials(emp.name);
+    const avInner=emp.photo?`<img src="${emp.photo}" alt="${emp.name}"/>`:`${init}`;
+
+    // --- ส่วนที่เพิ่มใหม่: สร้างป้ายสถานะ (Badge) ไว้แสดงใต้ชื่อ ---
+    let statusHtml = '';
+    
+    // 1. ถ้าเป็นพนักงานสำรอง
+    if(att?.isSub) {
+      statusHtml += '<div class="sub-badge" style="margin-bottom:4px;">สำรอง</div>';
+    }
+
+    // 2. ถ้าอยู่ในหน้า "ออกงาน" และยังไม่ได้กดออกงาน ให้ตรวจสอบว่าเข้างานหรือยัง
+    if(S.action === 'checkout' && !isDone) {
+      if(att?.checkin) {
+        statusHtml += '<div class="badge b-green" style="font-size:10px; padding:3px 6px;">🟢 เข้างานแล้ว</div>';
+      } else {
+        statusHtml += '<div class="badge b-dim" style="font-size:10px; padding:3px 6px;">⚪ ยังไม่เข้างาน</div>';
+      }
+    }
+    // --------------------------------------------------------
+
+    return `<div class="emp-card${isDone?' done':''}" ${isDone?'':'onclick="selEmp(\''+emp.id+'\')"'}>
+      <div class="emp-av">${avInner}</div>
+      <div class="emp-nm" style="margin-bottom: 2px;">${emp.name}</div>
+      <div style="display:flex; flex-direction:column; gap:4px; align-items:center;">
+        ${statusHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+function selEmp(id) {
+  const emps=getEmps(), dep=S.effDept;
+  const emp=(emps[dep]||[]).find(e=>e.id===id);
+  if(!emp)return;
+  S.emp=emp; S.photo=null; S.photoTaken=false; S.isSub=false;
+
+  document.getElementById('cf-act-lbl').textContent=S.action==='checkin'?'🟢 บันทึกเข้างาน':'🔴 บันทึกออกงาน';
+  document.getElementById('cf-nm').textContent=emp.name;
+  document.getElementById('cf-dept').textContent=dep;
+  const av=document.getElementById('cf-av');
+  av.innerHTML=emp.photo?`<img src="${emp.photo}" alt="${emp.name}"/>`:`${initials(emp.name)}`;
+
+  // Reset UI
+  document.getElementById('sub-sw').className='sw';
+  document.getElementById('photo-warn').className='photo-warn';
+  document.getElementById('snap-btn').className='snap-btn';
+  document.getElementById('snap-btn').innerHTML='📷 เปิดกล้อง';
+  document.getElementById('retake-btn').style.display='none';
+  const cv=document.getElementById('cam-cv');
+  cv.className=''; cv.style.display='none';
+  document.getElementById('cam-vid').style.display='block';
+  document.getElementById('cam-ph').style.display='flex';
+  document.getElementById('cam-ov').style.display='none';
+  stopCam();
+
+  SS('confirm');
+  setTimeout(startCam, 350);
+}
+
+// ════════════════════════════════════
+// CAMERA
+// ════════════════════════════════════
+async function startCam() {
+  try {
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:960}}});
+    S.stream=stream;
+    const vid=document.getElementById('cam-vid');
+    vid.srcObject=stream; vid.style.display='block';
+    document.getElementById('cam-ph').style.display='none';
+    document.getElementById('cam-ov').style.display='block';
+    document.getElementById('snap-btn').innerHTML='📸 ถ่ายรูป';
+    tickOverlay();
+  } catch(e) {
+    const ph=document.getElementById('cam-ph');
+    ph.style.display='flex';
+    ph.innerHTML=`<div class="ci">⚠️</div><div class="ct">ไม่สามารถเปิดกล้องได้<br/><small style="color:var(--text3)">ต้องใช้งานผ่าน HTTPS</small></div>`;
+    document.getElementById('snap-btn').innerHTML='📷 ลองใหม่';
+  }
+}
+function tickOverlay() {
+  if(S.screen!=='confirm'||S.photoTaken)return;
+  const n=new Date();
+  const ms=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const t=`${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+  const d=`${n.getDate()} ${ms[n.getMonth()]} ${n.getFullYear()+543}`;
+  const on=document.getElementById('ov-name'); if(on) on.textContent=`${S.emp?.name||''} · ${S.effDept}`;
+  const ot=document.getElementById('ov-time'); if(ot) ot.textContent=`${d}  ${t}`;
+  setTimeout(tickOverlay,1000);
+}
+function stopCam() {
+  if(S.stream){ S.stream.getTracks().forEach(t=>t.stop()); S.stream=null; }
+}
+function snapBtn() { S.stream ? takePhoto() : startCam(); }
+function takePhoto() {
+  const vid=document.getElementById('cam-vid');
+  const cv=document.getElementById('cam-cv');
+  if(!vid.videoWidth){ toastMsg('กล้องยังไม่พร้อม','err'); return; }
+  cv.width=vid.videoWidth; cv.height=vid.videoHeight;
+  const ctx=cv.getContext('2d');
+  ctx.drawImage(vid,0,0);
+  stampPhoto(ctx,cv.width,cv.height);
+  cv.className='show'; cv.style.display='block';
+  document.getElementById('cam-vid').style.display='none';
+  S.photo=cv.toDataURL('image/jpeg',.85);
+  S.photoTaken=true;
+  stopCam();
+  document.getElementById('snap-btn').className='snap-btn done';
+  document.getElementById('snap-btn').innerHTML='✅ ถ่ายรูปแล้ว';
+  document.getElementById('retake-btn').style.display='block';
+  document.getElementById('cam-ov').style.display='none';
+  document.getElementById('photo-warn').className='photo-warn';
+}
+function stampPhoto(ctx,w,h) {
+  const n=new Date();
+  const ms=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const tStr=`${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+  const dStr=`${n.getDate()} ${ms[n.getMonth()]} ${n.getFullYear()+543}`;
+  const cfg=getCfg();
+  const actLabel=S.action==='checkin'?'● เข้างาน':'● ออกงาน';
+  const actColor=S.action==='checkin'?'#22C55E':'#EF4444';
+  const bh=Math.round(h*.13);
+  const fs=Math.round(w*.036);
+
+  // Top bar
+  ctx.fillStyle='rgba(0,0,0,.6)';
+  ctx.fillRect(0,0,w,Math.round(h*.055));
+  ctx.font=`${Math.round(w*.027)}px Sarabun,sans-serif`;
+  ctx.fillStyle='rgba(255,255,255,.85)';
+  ctx.textAlign='left'; ctx.fillText(cfg.condoName||'นิติบุคคลคอนโด',10,Math.round(h*.04));
+  ctx.textAlign='right'; ctx.fillText(dStr,w-10,Math.round(h*.04));
+
+  // Bottom bar
+  ctx.fillStyle='rgba(0,0,0,.7)';
+  ctx.fillRect(0,h-bh,w,bh);
+
+  // Name
+  ctx.font=`bold ${fs}px Sarabun,sans-serif`;
+  ctx.fillStyle='#fff'; ctx.textAlign='left';
+  ctx.fillText(S.emp?.name||'',14,h-bh+fs+4);
+
+  // Dept
+  ctx.font=`${Math.round(fs*.82)}px Sarabun,sans-serif`;
+  ctx.fillStyle='#ccc';
+  ctx.fillText(S.effDept,14,h-bh+fs*1.9+4);
+
+  // Action
+  ctx.fillStyle=actColor;
+  ctx.font=`bold ${Math.round(fs*.82)}px Sarabun,sans-serif`;
+  ctx.textAlign='right';
+  ctx.fillText(actLabel,w-12,h-bh+fs+4);
+
+  // Time
+  ctx.fillStyle='#4F8EF7';
+  ctx.font=`bold ${fs}px monospace`;
+  ctx.fillText(tStr,w-12,h-bh+fs*1.9+4);
+}
+function retake() {
+  const vid=document.getElementById('cam-vid');
+  const cv=document.getElementById('cam-cv');
+  cv.className=''; cv.style.display='none';
+  vid.style.display='block';
+  S.photo=null; S.photoTaken=false;
+  document.getElementById('snap-btn').className='snap-btn';
+  document.getElementById('snap-btn').innerHTML='📸 ถ่ายรูป';
+  document.getElementById('retake-btn').style.display='none';
+  document.getElementById('cam-ov').style.display='block';
+  startCam();
+}
+
+// ════════════════════════════════════
+// SUBSTITUTE TOGGLE
+// ════════════════════════════════════
+function toggleSub() {
+  S.isSub=!S.isSub;
+  document.getElementById('sub-sw').className='sw'+(S.isSub?' on':'');
+}
+
+// ════════════════════════════════════
+// SUBMIT
+// ════════════════════════════════════
+async function submit() {
+  if(!S.photoTaken||!S.photo){
+    document.getElementById('photo-warn').className='photo-warn show'; return;
+  }
+  const n=new Date(), tStr=`${pad(n.getHours())}:${pad(n.getMinutes())}`, dStr=todayKey();
+
+  // Save locally
+  const today=getTodayAtt();
+  if(!today[S.emp.id]) today[S.emp.id]={};
+  today[S.emp.id][S.action]=tStr;
+  today[S.emp.id].isSub=S.isSub;
+  today[S.emp.id].dept=S.effDept;
+  today[S.emp.id].name=S.emp.name;
+  saveTodayAtt(today);
+
+  // Upload to GAS
+  const cfg=getCfg();
+  if(cfg.gasUrl) {
+    showLoad('กำลังอัพโหลดรูปและส่งข้อมูล...');
+    try {
+      const payload = {
+        action:'attendance', empId:S.emp.id, empName:S.emp.name,
+        dept:S.effDept, actionType:S.action, dateStr:dStr, time:tStr,
+        isSub:S.isSub, photo:S.photo,
+        condoName:cfg.condoName||'', driveId:cfg.driveId||'', sheetId:cfg.sheetId||''
+      };
+      const r = await fetch(cfg.gasUrl, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        redirect: 'follow',
+      });
+      const rawText = await r.text();
+      let res = {};
+      try { res = JSON.parse(rawText); }
+      catch { toastMsg('⚠️ GAS ตอบกลับผิดปกติ: '+rawText.slice(0,120), 'err'); hideLoad(); }
+      hideLoad();
+      if(res.success){
+        today[S.emp.id][S.action+'Url']=res.photoUrl||'';
+        saveTodayAtt(today);
+        toastMsg('☁️ อัพโหลด Google Sheets + Drive สำเร็จแล้ว','ok');
+      } else {
+        toastMsg('⚠️ GAS Error: '+(res.error||'ไม่ทราบสาเหตุ'),'err');
+      }
+    } catch(fe) {
+      hideLoad();
+      toastMsg('⚠️ เชื่อมต่อ GAS ไม่ได้: '+fe.message, 'err');
+    }
+  }
+
+  showSuccess(tStr);
+  SS('success');
+  renderHome();
+}
+
+function showSuccess(tStr) {
+  document.getElementById('suc-sub').textContent=`บันทึก${S.action==='checkin'?'เข้างาน':'ออกงาน'}เรียบร้อยแล้ว`;
+  document.getElementById('suc-nm').textContent=S.emp.name;
+  document.getElementById('suc-dept').textContent=S.effDept;
+  document.getElementById('suc-act').textContent=S.action==='checkin'?'🟢 เข้างาน':'🔴 ออกงาน';
+  document.getElementById('suc-time').textContent=tStr+' น.';
+  document.getElementById('suc-sub-row').style.display=S.isSub?'flex':'none';
+  let secs=5;
+  const cd=document.getElementById('suc-cd');
+  cd.textContent=`กลับหน้าพนักงานอัตโนมัติใน ${secs} วินาที`;
+  const iv=setInterval(()=>{
+    secs--;
+    if(secs<=0){clearInterval(iv);goGrid();return;}
+    cd.textContent=`กลับหน้าพนักงานอัตโนมัติใน ${secs} วินาที`;
+  },1000);
+}
+
+// กลับหน้าตารางพนักงาน (ไม่ต้อง Login ใหม่)
+function goGrid() {
+  stopCam();
+  S.emp=null; S.photo=null; S.photoTaken=false; S.isSub=false;
+  renderGrid();
+  SS('grid');
+}
+
+// ════════════════════════════════════
+// ADMIN DASHBOARD
+// ════════════════════════════════════
+function renderAdmin() {
+  const n=new Date();
+  const days=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  const ms=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const el=document.getElementById('adm-dt');
+  if(el) el.textContent=`วัน${days[n.getDay()]}ที่ ${n.getDate()} ${ms[n.getMonth()]} ${n.getFullYear()+543}`;
+
+  const emps=getEmps(), today=getTodayAtt();
+  const allKeys=['แม่บ้าน','รปภ กะเช้า','รปภ กะบ่าย','คนสวน'];
+  const all=allKeys.flatMap(k=>emps[k]||[]);
+  const inN=all.filter(e=>today[e.id]?.checkin).length;
+  const outN=all.filter(e=>today[e.id]?.checkout).length;
+  const missN=all.length-inN;
+  document.getElementById('st-in').textContent=inN;
+  document.getElementById('st-out').textContent=outN;
+  document.getElementById('st-miss').textContent=missN;
+
+  const groups=[
+    {label:'🧹 แม่บ้าน',keys:['แม่บ้าน']},
+    {label:'🌅 รปภ กะเช้า',keys:['รปภ กะเช้า']},
+    {label:'🌙 รปภ กะบ่าย',keys:['รปภ กะบ่าย']},
+    {label:'🌿 คนสวน',keys:['คนสวน']},
+  ];
+  const bd=document.getElementById('dept-bd');
+  bd.innerHTML=groups.map((g,gi)=>{
+    const dEmps=g.keys.flatMap(k=>emps[k]||[]);
+    const dIn=dEmps.filter(e=>today[e.id]?.checkin).length;
+    const rows=dEmps.map(emp=>{
+      const att=today[emp.id]||{};
+      const hasIn=!!att.checkin, hasOut=!!att.checkout;
+      const av=emp.photo?`<img src="${emp.photo}"/>`:`${initials(emp.name)}`;
+      const stBadge=hasIn&&hasOut?'<span class="badge b-green">✓ ครบ</span>':hasIn?'<span class="badge b-blue">เข้าแล้ว</span>':'<span class="badge b-dim">ยังไม่มา</span>';
+      return `<div class="dei">
+        <div class="dei-av">${av}</div>
+        <div>
+          <div class="dei-nm">${emp.name}${att.isSub?'<span class="badge b-amber" style="margin-left:6px;font-size:10px;padding:2px 6px">สำรอง</span>':''}</div>
+          <div class="dei-tm">${hasIn?`เข้า ${att.checkin}`:'ยังไม่เข้า'}${hasOut?` · ออก ${att.checkout}`:''}</div>
+        </div>
+        <div class="dei-st">${stBadge}</div>
+      </div>`;
+    }).join('');
+    return `<div class="dept-row">
+      <div class="dept-row-hd" onclick="toggleBD(${gi})">
+        <span class="dept-row-nm">${g.label}</span>
+        <span class="dept-row-ct">${dIn}/${dEmps.length} คน</span>
+        <span class="dept-row-ar" id="dra-${gi}">›</span>
+      </div>
+      <div class="dept-emp-list" id="del-${gi}" style="display:none">${rows}</div>
+    </div>`;
+  }).join('');
+}
+function toggleBD(i) {
+  const el=document.getElementById('del-'+i), ar=document.getElementById('dra-'+i);
+  const open=el.style.display==='none';
+  el.style.display=open?'block':'none';
+  ar.className='dept-row-ar'+(open?' open':'');
+}
+
+// ════════════════════════════════════
+// ADMIN — EMPLOYEES
+// ════════════════════════════════════
+const EMP_TABS=['แม่บ้าน','รปภ กะเช้า','รปภ กะบ่าย','คนสวน'];
+function renderEmpMgr() {
+  if(!S.empTab) S.empTab=EMP_TABS[0];
+  const tabs=document.getElementById('emp-tabs');
+  tabs.innerHTML=EMP_TABS.map(t=>`<div class="dtab${t===S.empTab?' act':''}" onclick="switchEmpTab('${t}')">${t}</div>`).join('');
+  renderEmpList();
+}
+function switchEmpTab(t) { S.empTab=t; renderEmpMgr(); }
+function renderEmpList() {
+  const emps=getEmps(), list=document.getElementById('emp-list');
+  const dEmps=emps[S.empTab]||[];
+  list.innerHTML=dEmps.map(emp=>{
+    const av=emp.photo?`<img src="${emp.photo}"/>`:`${initials(emp.name)}`;
+    return `<div class="em-card" id="ec-${emp.id}">
+      <div class="em-av" onclick="trigPhoto('${emp.id}')">${av}<div class="ov">📷</div></div>
+      <div style="flex:1">
+        <input class="em-ni" value="${emp.name}" onchange="updEmpName('${emp.id}',this.value)" placeholder="ชื่อ-นามสกุล"/>
+        <div class="em-sub">กดที่รูปเพื่อเปลี่ยน</div>
+      </div>
+      <div class="em-del" onclick="delEmp('${emp.id}')">✕</div>
+    </div>`;
+  }).join('')
+  +`<button class="add-emp-btn" onclick="addEmp()">+ เพิ่มพนักงานใหม่</button>`;
+}
+function trigPhoto(id) {
+  S.editPhotoId=id;
+  document.getElementById('photo-inp').click();
+}
+function onPhoto(e) {
+  const f=e.target.files[0]; if(!f)return;
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    const emps=getEmps(), dep=S.empTab;
+    const emp=(emps[dep]||[]).find(x=>x.id===S.editPhotoId);
+    if(emp){ emp.photo=ev.target.result; SV(K.emps,emps); renderEmpList(); toastMsg('✅ อัพโหลดรูปแล้ว','ok'); }
+  };
+  rd.readAsDataURL(f);
+  e.target.value='';
+}
+function updEmpName(id,name) {
+  const emps=getEmps(), dep=S.empTab;
+  const emp=(emps[dep]||[]).find(x=>x.id===id);
+  if(emp){ emp.name=name; SV(K.emps,emps); }
+}
+function delEmp(id) {
+  if(!confirm('ลบพนักงานนี้?'))return;
+  const emps=getEmps();
+  emps[S.empTab]=(emps[S.empTab]||[]).filter(e=>e.id!==id);
+  SV(K.emps,emps); renderEmpList(); toastMsg('🗑️ ลบแล้ว','ok');
+}
+function addEmp() {
+  const emps=getEmps();
+  if(!emps[S.empTab]) emps[S.empTab]=[];
+  emps[S.empTab].push({id:'e'+Date.now().toString(36),name:'พนักงานใหม่',photo:null});
+  SV(K.emps,emps); renderEmpList();
+}
+
+// ════════════════════════════════════
+// ADMIN — PINS
+// ════════════════════════════════════
+function renderPins() {
+  const pins=getPins();
+  const items=[
+    {k:'แม่บ้าน',lbl:'แม่บ้าน',ic:'🧹',bc:'b-red'},
+    {k:'รปภ',    lbl:'รปภ (ทุกกะ)',ic:'🛡️',bc:'b-blue'},
+    {k:'คนสวน',  lbl:'คนสวน',ic:'🌿',bc:'b-green'},
+    {k:'admin',  lbl:'Admin',ic:'⚙️',bc:'b-purple'},
+  ];
+  document.getElementById('pins-list').innerHTML=items.map(it=>`
+    <div class="pin-mc">
+      <div class="pm-hd">
+        <span class="pm-ic">${it.ic}</span>
+        <span class="pm-nm">${it.lbl}</span>
+        <span class="badge ${it.bc} pm-bd">PIN</span>
+      </div>
+      <div class="pf">
+        <div class="pdsp" id="pd-${it.k}">${'●'.repeat((pins[it.k]||'').length)}</div>
+        <input class="p-inp" id="pi-${it.k}" type="tel" maxlength="6" placeholder="รหัสใหม่" />
+        <button class="p-edit" id="pe-${it.k}" onclick="editPin('${it.k}')">แก้ไข</button>
+        <button class="p-save" id="ps-${it.k}" onclick="savePin('${it.k}')">บันทึก</button>
+      </div>
+    </div>`).join('');
+}
+function editPin(k) {
+  document.getElementById('pd-'+k).style.display='none';
+  document.getElementById('pe-'+k).style.display='none';
+  document.getElementById('pi-'+k).classList.add('show');
+  document.getElementById('ps-'+k).classList.add('show');
+  document.getElementById('pi-'+k).focus();
+}
+function savePin(k) {
+  const v=document.getElementById('pi-'+k).value.trim();
+  if(v.length!==6||!/^\d{6}$/.test(v)){toastMsg('PIN ต้องเป็นตัวเลข 6 หลัก','err');return;}
+  const pins=getPins(); pins[k]=v; SV(K.pins,pins);
+  document.getElementById('pd-'+k).textContent='●●●●●●';
+  document.getElementById('pd-'+k).style.display='block';
+  document.getElementById('pe-'+k).style.display='block';
+  document.getElementById('pi-'+k).classList.remove('show'); document.getElementById('pi-'+k).value='';
+  document.getElementById('ps-'+k).classList.remove('show');
+  toastMsg(`✅ บันทึก PIN "${k}" แล้ว`,'ok');
+}
+
+// ════════════════════════════════════
+// ADMIN — SETTINGS
+// ════════════════════════════════════
+function renderSet() {
+  const c=getCfg();
+  document.getElementById('si-name').value=c.condoName||'';
+  document.getElementById('si-rooms').value=c.rooms||'';
+  document.getElementById('si-gas').value=c.gasUrl||'';
+  document.getElementById('si-drive').value=c.driveId||'';
+  document.getElementById('si-sheet').value=c.sheetId||'';
+}
+function saveSet() {
+  const c={
+    condoName:document.getElementById('si-name').value,
+    rooms:document.getElementById('si-rooms').value,
+    gasUrl:document.getElementById('si-gas').value.trim(),
+    driveId:document.getElementById('si-drive').value.trim(),
+    sheetId:document.getElementById('si-sheet').value.trim(),
+  };
+  SV(K.cfg,c);
+  toastMsg('✅ บันทึกการตั้งค่าแล้ว','ok');
+}
+async function testGAS() {
+  const url = document.getElementById('si-gas').value.trim();
+  const box = document.getElementById('gas-test-res');
+  if(!url){ box.style.display='block'; box.style.background='rgba(239,68,68,.1)'; box.style.border='1px solid rgba(239,68,68,.3)'; box.style.color='var(--red)'; box.textContent='⚠️ กรุณากรอก GAS URL ก่อน'; return; }
+  box.style.display='block'; box.style.background='rgba(79,142,247,.1)'; box.style.border='1px solid rgba(79,142,247,.3)'; box.style.color='var(--blue)'; box.textContent='⏳ กำลังทดสอบ...';
+  try {
+    // GAS GET test (simple ping)
+    const r = await fetch(url+'?action=test', { redirect:'follow' });
+    const txt = await r.text();
+    let res = {};
+    try { res = JSON.parse(txt); } catch { /* not json */ }
+    if(res.success || txt.includes('GAS')) {
+      box.style.background='rgba(34,197,94,.1)'; box.style.border='1px solid rgba(34,197,94,.3)'; box.style.color='var(--green)';
+      box.textContent='✅ เชื่อมต่อ GAS สำเร็จ! พร้อมใช้งาน';
+    } else {
+      box.style.background='rgba(245,158,11,.1)'; box.style.border='1px solid rgba(245,158,11,.3)'; box.style.color='var(--amber)';
+      box.textContent='⚠️ GAS ตอบกลับแต่ผิดรูปแบบ: '+txt.slice(0,150);
+    }
+  } catch(e) {
+    box.style.background='rgba(239,68,68,.1)'; box.style.border='1px solid rgba(239,68,68,.3)'; box.style.color='var(--red)';
+    box.textContent='❌ เชื่อมต่อไม่ได้: '+e.message+' (อาจเกิดจาก URL ผิด หรือ GAS ยังไม่ได้ Deploy)';
+  }
+}
+function clearToday() {
+  if(!confirm('ล้างข้อมูลวันนี้?'))return;
+  const a=getAtt(); delete a[todayKey()]; SV(K.att,a);
+  toastMsg('✅ ล้างข้อมูลวันนี้แล้ว','ok'); renderAdmin();
+}
+function clearAll() {
+  if(!confirm('⚠️ ลบข้อมูลทั้งหมด?'))return;
+  SV(K.att,{}); toastMsg('🗑️ ลบแล้ว','ok'); renderAdmin();
+}
+
+// ════════════════════════════════════
+// EXPORT CSV
+// ════════════════════════════════════
+function exportCSV() {
+  const today=getTodayAtt(), emps=getEmps(), dStr=todayKey();
+  const rows=[['ชื่อพนักงาน','แผนก','วันที่','เวลาเข้า','เวลาออก','สถานะพนักงาน','ลิงค์รูปเข้า','ลิงค์รูปออก']];
+  ['แม่บ้าน','รปภ กะเช้า','รปภ กะบ่าย','คนสวน'].forEach(k=>{
+    (emps[k]||[]).forEach(emp=>{
+      const a=today[emp.id]||{};
+      rows.push([emp.name,k,dStr,a.checkin||'',a.checkout||'',a.isSub?'สำรอง':'ปกติ',a.checkinUrl||'',a.checkoutUrl||'']);
+    });
+  });
+  const bom='\uFEFF';
+  const csv=bom+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`attendance_${dStr}.csv`; a.click();
+  URL.revokeObjectURL(a.href);
+  toastMsg('📊 Export สำเร็จ','ok');
+}
+
+// ════════════════════════════════════
+// LOADING & TOAST
+// ════════════════════════════════════
+function showLoad(msg='กำลังโหลด...') {
+  document.getElementById('load-txt').textContent=msg;
+  document.getElementById('loadWrap').classList.add('on');
+}
+function hideLoad() { document.getElementById('loadWrap').classList.remove('on'); }
+
+function toastMsg(msg,type='ok') {
+  const ic={ok:'✅',err:'⚠️'};
+  const el=document.createElement('div');
+  el.className=`toast ${type}`;
+  el.innerHTML=`<span>${ic[type]||'ℹ️'}</span><span>${msg}</span>`;
+  document.getElementById('toastWrap').appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300);},3000);
+}
+
+// ════════════════════════════════════
+// UTILS
+// ════════════════════════════════════
+function pad(n){return String(n).padStart(2,'0');}
+function initials(name){ return (name||'').split(' ').map(w=>w[0]).filter(Boolean).join('').slice(0,2)||'?'; }
+
+// ════════════════════════════════════
+// INTERVAL TICKS
+// ════════════════════════════════════
+setInterval(()=>{
+  if(S.screen==='action') tickClock();
+  if(S.screen==='home')   updateHomeDT();
+  checkReset();
+},10000);
+
+// ════════════════════════════════════
+// INIT
+// ════════════════════════════════════
+checkReset();
+renderHome();
+tickClock();
+</script>
+</body>
+</html>
