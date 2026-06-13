@@ -1458,6 +1458,9 @@ function toggleSub() {
 // ════════════════════════════════════
 // SUBMIT
 // ════════════════════════════════════
+// ════════════════════════════════════
+// SUBMIT
+// ════════════════════════════════════
 async function submit() {
   if(!S.photoTaken||!S.photo){
     document.getElementById('photo-warn').className='photo-warn show'; return;
@@ -1491,27 +1494,43 @@ async function submit() {
       });
       const rawText = await r.text();
       let res = {};
-      try { res = JSON.parse(rawText); }
-      catch { toastMsg('⚠️ GAS ตอบกลับผิดปกติ: '+rawText.slice(0,120), 'err'); hideLoad(); }
+      
+      try { 
+        res = JSON.parse(rawText); 
+      } catch { 
+        toastMsg('⚠️ GAS ตอบกลับผิดปกติ: '+rawText.slice(0,120), 'err'); 
+        hideLoad(); 
+        return; // หยุดการทำงานถ้าไม่สามารถอ่าน JSON ได้
+      }
+      
       hideLoad();
       if(res.success){
         today[S.emp.id][S.action+'Url']=res.photoUrl||'';
         saveTodayAtt(today);
         toastMsg('☁️ อัพโหลด Google Sheets + Drive สำเร็จแล้ว','ok');
+        
+        // --- ย้ายการโชว์หน้าสำเร็จมาไว้ในบล็อกนี้ (ต้องส่งข้อมูลผ่านจริงๆ ถึงจะขึ้นติ๊กถูก) ---
+        showSuccess(tStr);
+        SS('success');
+        renderHome();
+        
       } else {
+        // ถ้า GAS ฟ้อง Error ให้โชว์แจ้งเตือนและหยุดการทำงาน (ไม่เปลี่ยนหน้า)
         toastMsg('⚠️ GAS Error: '+(res.error||'ไม่ทราบสาเหตุ'),'err');
+        return;
       }
     } catch(fe) {
       hideLoad();
       toastMsg('⚠️ เชื่อมต่อ GAS ไม่ได้: '+fe.message, 'err');
+      return; // หยุดการทำงานถ้าเน็ตหลุดหรือต่อ GAS ไม่ได้
     }
+  } else {
+     // กรณีไม่ได้ใส่ URL ไว้ในตั้งค่า (โหมดทดสอบ)
+     showSuccess(tStr);
+     SS('success');
+     renderHome();
   }
-
-  showSuccess(tStr);
-  SS('success');
-  renderHome();
 }
-
 function showSuccess(tStr) {
   document.getElementById('suc-sub').textContent=`บันทึก${S.action==='checkin'?'เข้างาน':'ออกงาน'}เรียบร้อยแล้ว`;
   document.getElementById('suc-nm').textContent=S.emp.name;
